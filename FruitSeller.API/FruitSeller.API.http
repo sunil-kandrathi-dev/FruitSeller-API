@@ -1,0 +1,6 @@
+@FruitSeller.API_HostAddress = http://localhost:5159
+
+GET {{FruitSeller.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="FruitSeller.API.Tests/FruitSeller.API.Tests.csproj" />
+  <Project Path="FruitSeller.API/FruitSeller.API.csproj" />
+  <Project Path="FruitSeller.Application/FruitSeller.Application.csproj" />
+  <Project Path="FruitSeller.Domain/FruitSeller.Domain.csproj" />
+  <Project Path="FruitSeller.Infrastructure/FruitSeller.Infrastructure.csproj" />
+</Solution>
