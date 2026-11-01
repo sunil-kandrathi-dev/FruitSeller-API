@@ -1,9 +1,7 @@
-using FruitSeller.API.Dtos;
-using FruitSeller.API.Utilities;
-using FruitSeller.Domain.Entities;
-using FruitSeller.Infrastructure.Persistence;
+using FruitSeller.Application.Dtos;
+using FruitSeller.Application.Services;
+using FruitSeller.Application.Validation;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FruitSeller.API.Controllers;
 
@@ -11,38 +9,17 @@ namespace FruitSeller.API.Controllers;
 [Route("api/[controller]")]
 public class ExpensesController : ControllerBase
 {
-    private readonly FruitSellerDbContext _db;
+    private readonly IExpenseService _expenseService;
 
-    public ExpensesController(FruitSellerDbContext db)
+    public ExpensesController(IExpenseService expenseService)
     {
-        _db = db;
+        _expenseService = expenseService;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ExpenseDto>>> Get([FromQuery] DateOnly? fromDate, [FromQuery] DateOnly? toDate)
     {
-        var query = _db.Expenses.AsNoTracking().AsQueryable();
-
-        if (fromDate.HasValue)
-        {
-            query = query.Where(x => x.ExpenseDate >= fromDate.Value);
-        }
-
-        if (toDate.HasValue)
-        {
-            query = query.Where(x => x.ExpenseDate <= toDate.Value);
-        }
-
-        var expenses = await query.OrderByDescending(x => x.ExpenseDate).ThenByDescending(x => x.ExpenseId).ToListAsync();
-        return Ok(expenses.Select(x => new ExpenseDto
-        {
-            ExpenseId = x.ExpenseId,
-            Category = x.Category,
-            Description = x.Description,
-            ExpenseDate = x.ExpenseDate,
-            Amount = x.Amount,
-            CreatedAt = x.CreatedAt
-        }));
+        return Ok(await _expenseService.GetExpensesAsync(fromDate, toDate));
     }
 
     [HttpPost]
@@ -56,52 +33,17 @@ public class ExpensesController : ControllerBase
             }));
         }
 
-        var category = ValidationHelpers.NormalizeCategory(request.Category);
-
-        if (!ValidationHelpers.IsValidCategory(category))
+        try
+        {
+            var expense = await _expenseService.CreateExpenseAsync(request);
+            return CreatedAtAction(nameof(Get), new { id = expense.ExpenseId }, expense);
+        }
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
             {
-                ["category"] = ["Category is not valid. Allowed values are Transport, Packaging, Loading and unloading, Shop rent, Electricity, or Other expenses."]
+                ["request"] = [ex.Message]
             }));
         }
-
-        if (request.Amount <= 0m)
-        {
-            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
-            {
-                ["amount"] = ["Expense amount must be greater than zero."]
-            }));
-        }
-
-        if (request.ExpenseDate > DateOnly.FromDateTime(DateTime.UtcNow))
-        {
-            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
-            {
-                ["expenseDate"] = ["Expense date cannot be in the future."]
-            }));
-        }
-
-        var expense = new Expense
-        {
-            Category = category,
-            Description = string.IsNullOrWhiteSpace(request.Description) ? null : ValidationHelpers.NormalizeText(request.Description),
-            ExpenseDate = request.ExpenseDate,
-            Amount = request.Amount,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _db.Expenses.Add(expense);
-        await _db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(Get), new { id = expense.ExpenseId }, new ExpenseDto
-        {
-            ExpenseId = expense.ExpenseId,
-            Category = expense.Category,
-            Description = expense.Description,
-            ExpenseDate = expense.ExpenseDate,
-            Amount = expense.Amount,
-            CreatedAt = expense.CreatedAt
-        });
     }
 }

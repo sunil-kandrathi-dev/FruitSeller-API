@@ -1,4 +1,5 @@
-using FruitSeller.API.Utilities;
+﻿using FruitSeller.Application.Validation;
+using FruitSeller.Domain.BusinessRules;
 
 namespace FruitSeller.API.Tests;
 
@@ -26,6 +27,38 @@ public class BusinessRulesTests
         var result = BusinessRules.IsSaleAllowed(4, 6);
 
         Assert.False(result);
+    }
+
+    [Fact]
+    public void IsValidPaymentAmount_RejectsZeroOrNegativeAmounts()
+    {
+        Assert.True(BusinessRules.IsValidPaymentAmount(25m));
+        Assert.False(BusinessRules.IsValidPaymentAmount(0m));
+        Assert.False(BusinessRules.IsValidPaymentAmount(-5m));
+    }
+
+    [Fact]
+    public void CalculateWeightedAverageCost_ReturnsCorrectBlendedRate()
+    {
+        var result = BusinessRules.CalculateWeightedAverageCost(10m, 100, 12m, 50);
+
+        Assert.Equal(10.666666666666666666666666667m, result);
+    }
+
+    [Fact]
+    public void CanAcceptPayment_UsesOutstandingBalanceGuard()
+    {
+        Assert.True(BusinessRules.CanAcceptPayment(500m, 500m));
+        Assert.True(BusinessRules.CanAcceptPayment(500m, 400m));
+        Assert.False(BusinessRules.CanAcceptPayment(500m, 600m));
+        Assert.False(BusinessRules.CanAcceptPayment(500m, 0m));
+    }
+
+    [Fact]
+    public void HasSufficientStock_RejectsNegativeStock()
+    {
+        Assert.True(BusinessRules.HasSufficientStock(12, 7));
+        Assert.False(BusinessRules.HasSufficientStock(4, 6));
     }
 }
 
@@ -62,6 +95,18 @@ public class ValidationHelpersTests
     public void NormalizeCategory_ReturnsCanonicalDatabaseValue(string category, string expected)
     {
         var result = ValidationHelpers.NormalizeCategory(category);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("Cash", true)]
+    [InlineData("UPI", true)]
+    [InlineData("Card", false)]
+    [InlineData(null, false)]
+    public void IsValidPaymentMethod_ValidatesSupportedMethods(string? paymentMethod, bool expected)
+    {
+        var result = ValidationHelpers.IsValidPaymentMethod(paymentMethod);
 
         Assert.Equal(expected, result);
     }

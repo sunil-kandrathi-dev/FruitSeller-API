@@ -1,4 +1,4 @@
-namespace FruitSeller.API.Dtos;
+namespace FruitSeller.Application.Dtos;
 
 public class ExpenseDto
 {

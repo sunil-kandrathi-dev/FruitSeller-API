@@ -10,6 +10,11 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<IShopService, ShopService>();
         services.AddScoped<IFruitService, FruitService>();
+        services.AddScoped<IPurchaseService, PurchaseService>();
+        services.AddScoped<ISaleService, SaleService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IExpenseService, ExpenseService>();
+        services.AddScoped<IReportService, ReportService>();
         return services;
     }
 }
