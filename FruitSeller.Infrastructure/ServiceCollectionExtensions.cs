@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<ISupplierPaymentService, SupplierPaymentService>();
         services.AddScoped<IExpenseService, ExpenseService>();
         services.AddScoped<IReportService, ReportService>();
         return services;

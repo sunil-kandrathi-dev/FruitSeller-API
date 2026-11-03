@@ -43,34 +43,58 @@ public class ReportService : IReportService
             paymentQuery = paymentQuery.Where(x => x.PaymentDate <= toDate.Value);
         }
 
-        var salesTotal = await salesQuery.SumAsync(x => (decimal?)x.TotalAmount ?? 0m);
-        var salesCount = await salesQuery.CountAsync();
-        var salesBoxCount = await salesQuery.SumAsync(x => (int?)x.BoxQuantity ?? 0);
+        var salesSummary = await salesQuery
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                Total = x.Sum(y => (decimal?)y.TotalAmount ?? 0m),
+                Count = x.Count(),
+                BoxCount = x.Sum(y => (int?)y.BoxQuantity ?? 0)
+            })
+            .FirstOrDefaultAsync() ?? new { Total = 0m, Count = 0, BoxCount = 0 };
 
-        var purchaseTotal = await purchaseQuery.SumAsync(x => (decimal?)x.TotalCost ?? 0m);
-        var purchaseCount = await purchaseQuery.CountAsync();
-        var purchaseBoxCount = await purchaseQuery.SumAsync(x => (int?)x.BoxQuantity ?? 0);
+        var purchaseSummary = await purchaseQuery
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                Total = x.Sum(y => (decimal?)y.TotalCost ?? 0m),
+                Count = x.Count(),
+                BoxCount = x.Sum(y => (int?)y.BoxQuantity ?? 0)
+            })
+            .FirstOrDefaultAsync() ?? new { Total = 0m, Count = 0, BoxCount = 0 };
 
-        var expenseTotal = await expenseQuery.SumAsync(x => (decimal?)x.Amount ?? 0m);
-        var expenseCount = await expenseQuery.CountAsync();
+        var expenseSummary = await expenseQuery
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                Total = x.Sum(y => (decimal?)y.Amount ?? 0m),
+                Count = x.Count()
+            })
+            .FirstOrDefaultAsync() ?? new { Total = 0m, Count = 0 };
 
-        var paymentTotal = await paymentQuery.SumAsync(x => (decimal?)x.Amount ?? 0m);
-        var paymentCount = await paymentQuery.CountAsync();
+        var paymentSummary = await paymentQuery
+            .GroupBy(_ => 1)
+            .Select(x => new
+            {
+                Total = x.Sum(y => (decimal?)y.Amount ?? 0m),
+                Count = x.Count()
+            })
+            .FirstOrDefaultAsync() ?? new { Total = 0m, Count = 0 };
 
-        var comparisonValue = BusinessRules.CalculateBusinessResult(salesTotal, purchaseTotal, expenseTotal);
+        var comparisonValue = BusinessRules.CalculateBusinessResult(salesSummary.Total, purchaseSummary.Total, expenseSummary.Total);
 
         return new ReportDto
         {
-            SalesTotal = salesTotal,
-            SalesCount = salesCount,
-            SalesBoxCount = salesBoxCount,
-            PurchaseTotal = purchaseTotal,
-            PurchaseCount = purchaseCount,
-            PurchaseBoxCount = purchaseBoxCount,
-            ExpenseTotal = expenseTotal,
-            ExpenseCount = expenseCount,
-            PaymentTotal = paymentTotal,
-            PaymentCount = paymentCount,
+            SalesTotal = salesSummary.Total,
+            SalesCount = salesSummary.Count,
+            SalesBoxCount = salesSummary.BoxCount,
+            PurchaseTotal = purchaseSummary.Total,
+            PurchaseCount = purchaseSummary.Count,
+            PurchaseBoxCount = purchaseSummary.BoxCount,
+            ExpenseTotal = expenseSummary.Total,
+            ExpenseCount = expenseSummary.Count,
+            PaymentTotal = paymentSummary.Total,
+            PaymentCount = paymentSummary.Count,
             SalesMinusPurchaseCostMinusExpenses = comparisonValue,
             ComparisonNote = "Simple comparison only: Sales - Purchase cost - Expenses. This is not accounting profit."
         };
@@ -80,33 +104,33 @@ public class ReportService : IReportService
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var todaySalesTotal = await _db.Sales.AsNoTracking()
+        var todaySalesTotalTask = _db.Sales.AsNoTracking()
             .Where(x => x.SaleDate == today)
             .SumAsync(x => (decimal?)x.TotalAmount ?? 0m);
 
-        var todayBoxesDistributed = await _db.Sales.AsNoTracking()
+        var todayBoxesDistributedTask = _db.Sales.AsNoTracking()
             .Where(x => x.SaleDate == today)
             .SumAsync(x => (int?)x.BoxQuantity ?? 0);
 
-        var todayPaymentCollections = await _db.Payments.AsNoTracking()
+        var todayPaymentCollectionsTask = _db.Payments.AsNoTracking()
             .Where(x => x.PaymentDate == today)
             .SumAsync(x => (decimal?)x.Amount ?? 0m);
 
-        var shops = await _db.Shops.AsNoTracking().ToListAsync();
-        decimal totalOutstandingBalance = 0m;
+        var outstandingByShop = await _db.Shops.AsNoTracking()
+            .Select(shop => new
+            {
+                shop.OpeningBalance,
+                SalesTotal = _db.Sales.AsNoTracking()
+                    .Where(sale => sale.ShopId == shop.ShopId)
+                    .Sum(sale => (decimal?)sale.TotalAmount ?? 0m),
+                PaymentsTotal = _db.Payments.AsNoTracking()
+                    .Where(payment => payment.ShopId == shop.ShopId)
+                    .Sum(payment => (decimal?)payment.Amount ?? 0m)
+            })
+            .ToListAsync();
 
-        foreach (var shop in shops)
-        {
-            var salesTotal = await _db.Sales.AsNoTracking()
-                .Where(x => x.ShopId == shop.ShopId)
-                .SumAsync(x => (decimal?)x.TotalAmount ?? 0m);
-
-            var paymentsTotal = await _db.Payments.AsNoTracking()
-                .Where(x => x.ShopId == shop.ShopId)
-                .SumAsync(x => (decimal?)x.Amount ?? 0m);
-
-            totalOutstandingBalance += BusinessRules.CalculateOutstanding(shop.OpeningBalance, salesTotal, paymentsTotal);
-        }
+        var totalOutstandingBalance = outstandingByShop
+            .Sum(x => BusinessRules.CalculateOutstanding(x.OpeningBalance, x.SalesTotal, x.PaymentsTotal));
 
         var stockByFruit = await _db.InventoryMovements.AsNoTracking()
             .GroupBy(x => x.FruitId)
@@ -124,11 +148,13 @@ public class ReportService : IReportService
             .OrderBy(x => x.FruitName)
             .ToListAsync();
 
+        await Task.WhenAll(todaySalesTotalTask, todayBoxesDistributedTask, todayPaymentCollectionsTask);
+
         return new DashboardDto
         {
-            TodaySalesTotal = todaySalesTotal,
-            TodayBoxesDistributed = todayBoxesDistributed,
-            TodayPaymentCollections = todayPaymentCollections,
+            TodaySalesTotal = await todaySalesTotalTask,
+            TodayBoxesDistributed = await todayBoxesDistributedTask,
+            TodayPaymentCollections = await todayPaymentCollectionsTask,
             TotalOutstandingBalance = totalOutstandingBalance,
             CurrentStockByFruit = stockByFruit
         };
