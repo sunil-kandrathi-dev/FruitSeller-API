@@ -62,7 +62,13 @@ public static partial class ValidationHelpers
     public static bool IsValidPaymentMethod(string? paymentMethod)
     {
         return string.Equals(paymentMethod, "Cash", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(paymentMethod, "UPI", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(paymentMethod, "UPI", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paymentMethod, "Bank transfer", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsValidSupplierPaymentMethod(string? paymentMethod)
+    {
+        return IsValidPaymentMethod(paymentMethod);
     }
 
     public static DateOnly? ParseDate(string? value)

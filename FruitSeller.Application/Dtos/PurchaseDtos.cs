@@ -8,6 +8,8 @@ public class PurchaseDto
     public string SupplierName { get; set; } = string.Empty;
     public int BoxQuantity { get; set; }
     public decimal TotalCost { get; set; }
+    public decimal TotalPaid { get; set; }
+    public decimal OutstandingBalance { get; set; }
     public DateOnly PurchaseDate { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -19,4 +21,9 @@ public class CreatePurchaseRequest
     public int BoxQuantity { get; set; }
     public decimal TotalCost { get; set; }
     public DateOnly PurchaseDate { get; set; }
+    public decimal? InitialPaymentAmount { get; set; }
+    public string? InitialPaymentMethod { get; set; }
+    public DateOnly? InitialPaymentDate { get; set; }
+    public string? InitialPaymentReferenceNumber { get; set; }
+    public string? InitialPaymentNotes { get; set; }
 }

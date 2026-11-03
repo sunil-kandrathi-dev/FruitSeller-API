@@ -14,6 +14,7 @@ public class FruitSellerDbContext : DbContext
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
 
@@ -73,6 +74,22 @@ public class FruitSellerDbContext : DbContext
             entity.Property(x => x.PaymentMethod).HasMaxLength(10).IsRequired();
             entity.Property(x => x.PaymentDate).HasColumnType("date");
             entity.Property(x => x.CreatedAt).HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+        });
+
+        modelBuilder.Entity<SupplierPayment>(entity =>
+        {
+            entity.ToTable("SupplierPayments");
+            entity.HasKey(x => x.SupplierPaymentId);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.PaymentMethod).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.PaymentDate).HasColumnType("date");
+            entity.Property(x => x.ReferenceNumber).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnType("datetime2(0)").HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.HasOne(x => x.Purchase)
+                .WithMany()
+                .HasForeignKey(x => x.PurchaseId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<Expense>(entity =>
